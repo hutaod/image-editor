@@ -1,0 +1,79 @@
+你现在是一名资深 Flutter 开发工程师，需要帮我完成一款名为 **Days Reminder** 的移动应用，参考 Days Matter 的功能，但更简洁易用。  
+我将提供 UI 原型图（已上传）和功能需求，你需要按照以下要求完成整个项目的初版开发。
+
+## 1. 技术要求
+- 使用 Flutter（最新稳定版本）+ Dart
+- 支持 iOS 和 Android
+- 状态管理：Riverpod（推荐 hooks_riverpod）
+- 持久化存储：Hive
+- 日期处理：intl
+- 界面布局：Material 3 风格
+- 代码规范：Dart 官方 lints
+
+## 2. 功能需求
+### 2.1 首页
+- 显示事件列表（倒计时、已过去事件）
+- 按日期升序排列
+- 每个事件卡片显示：
+  - 事件标题
+  - 日期
+  - 剩余/已过天数
+- 支持左右滑动删除事件
+- 点击卡片进入编辑/详情页
+
+### 2.2 添加事件页
+- 事件标题输入框（必填）
+- 日期选择器（必填）
+- 类型选择：
+  - 倒计时（未来日期）
+  - 已过去（过去日期）
+- 备注（可选）
+- 保存到 Hive
+
+### 2.3 设置页
+- 应用主题切换（浅色 / 深色 / 跟随系统）
+- 数据备份与恢复（JSON 文件导出/导入）
+
+## 3. UI 参考
+- 参考我提供的原型图，保持简洁干净
+- 使用柔和配色（默认浅色模式）
+- 按钮和卡片圆角 16px
+- 列表可滚动
+
+## 4. 目录结构建议
+lib/
+  main.dart
+  theme/
+    app_theme.dart
+  models/
+    event.dart
+  providers/
+    event_provider.dart
+    theme_provider.dart
+  pages/
+    home_page.dart
+    add_event_page.dart
+    settings_page.dart
+  widgets/
+    event_card.dart
+
+## 5. 开发要求
+- 每个页面和组件拆分成独立文件
+- 使用 Riverpod 提供状态管理
+- 所有日期计算使用 `intl` 确保格式化
+- Hive 存储事件（box 名称：eventsBox）
+- 提供简单的单元测试（至少覆盖事件新增、删除、日期计算）
+- 代码中添加必要注释
+
+## 6. UI 配色 & 动画提示
+- 主色调：柔和蓝（#5A9BD5）、柔和橙（#F4A261）、柔和绿（#90BE6D）
+- 背景色：#F7F8FA（浅色模式）、#1E1E1E（深色模式）
+- 所有卡片使用轻微阴影（elevation: 2）
+- 页面切换使用淡入淡出动画（FadeTransition）
+- 列表项插入/删除使用 `AnimatedList` 动画
+- 按钮点击有缩放反馈动画
+
+## 7. 输出要求
+- 提供完整 Flutter 项目代码
+- 保证可以 `flutter pub get` 后直接运行
+- 代码风格遵循 Dart lints

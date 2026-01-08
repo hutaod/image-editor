@@ -1,0 +1,12 @@
+{
+  "zh": [
+    "addPhoto",
+    "takePhoto",
+    "selectFromGallery",
+    "removePhoto",
+    "photoPreview",
+    "photoBroken",
+    "permissionDenied",
+    "permissionDeniedDesc"
+  ]
+}
