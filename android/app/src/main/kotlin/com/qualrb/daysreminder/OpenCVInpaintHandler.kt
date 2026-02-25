@@ -5,14 +5,16 @@ import android.graphics.BitmapFactory
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.Mat
+import org.opencv.core.Point
 import org.opencv.core.Scalar
+import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import java.io.ByteArrayOutputStream
 
 object OpenCVInpaintHandler {
     private var isOpenCVInitialized = false
 
-    fun initialize(context: Context? = null): Boolean {
+    fun initialize(): Boolean {
         if (!isOpenCVInitialized) {
             // 尝试初始化 OpenCV
             isOpenCVInitialized = try {
@@ -63,11 +65,19 @@ object OpenCVInpaintHandler {
             }
         }
 
+        // 使用精确的 mask，不进行模糊处理，确保去除干净
+        // 只对 mask 边缘进行极轻微的羽化，避免硬边界
+        val featheredMask = Mat()
+        Imgproc.GaussianBlur(maskMat, featheredMask, Size(2.0, 2.0), 0.3)
+
         // 使用 OpenCV Inpaint 算法修复
         val dstMat = Mat()
-        // 使用 INPAINT_NS (Navier-Stokes) 算法，效果更好，减少模糊
-        // inpaintRadius 从 3.0 减小到 2.0，减少模糊范围
-        Imgproc.inpaint(srcMat, maskMat, dstMat, 2.0, Imgproc.INPAINT_NS)
+        // 使用 INPAINT_NS 算法，效果更好，去除更干净
+        // inpaint 半径使用 3.0，确保充分修复，避免去除不干净
+        Imgproc.inpaint(srcMat, featheredMask, dstMat, 3.0, Imgproc.INPAINT_NS)
+        
+        // 释放羽化后的 mask
+        featheredMask.release()
 
         // 转换回 Bitmap
         val resultBitmap = Bitmap.createBitmap(dstMat.cols(), dstMat.rows(), Bitmap.Config.ARGB_8888)

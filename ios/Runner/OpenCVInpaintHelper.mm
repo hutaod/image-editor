@@ -107,11 +107,16 @@
             return nil;
         }
         
+        // 使用精确的 mask，不进行过度模糊，确保去除干净
+        // 只对 mask 边缘进行极轻微的羽化，避免硬边界
+        cv::Mat featheredMask;
+        cv::GaussianBlur(maskMat, featheredMask, cv::Size(2, 2), 0.3);
+        
         // 使用 OpenCV Inpaint 算法修复
         cv::Mat dstMat;
-        // 使用 INPAINT_NS (Navier-Stokes) 算法，效果更好，减少模糊
-        // inpaintRadius 从 3.0 减小到 2.0，减少模糊范围
-        cv::inpaint(srcMatBGR, maskMat, dstMat, 2.0, cv::INPAINT_NS);
+        // 使用 INPAINT_NS 算法，效果更好，去除更干净
+        // inpaint 半径使用 3.0，确保充分修复，避免去除不干净
+        cv::inpaint(srcMatBGR, featheredMask, dstMat, 3.0, cv::INPAINT_NS);
         
         // 验证结果
         if (dstMat.empty() || dstMat.rows <= 0 || dstMat.cols <= 0) {

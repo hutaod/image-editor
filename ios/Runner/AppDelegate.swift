@@ -4,7 +4,7 @@ import UIKit
 // OpenCV Inpaint 处理类 - 使用 Objective-C++ 桥接
 class OpenCVInpaintHandler {
     static func inpaint(imagePath: String, rects: [[String: Double]]) -> Data? {
-        // 转换 rects 为 [[String: NSNumber]]
+        // 转换 rects 为 NSArray<NSDictionary<NSString*, NSNumber*>*>
         let nsRects: [[String: NSNumber]] = rects.map { rect -> [String: NSNumber] in
             var nsRect: [String: NSNumber] = [:]
             if let x = rect["x"] { nsRect["x"] = NSNumber(value: x) }
@@ -14,7 +14,7 @@ class OpenCVInpaintHandler {
             return nsRect
         }
         
-        // 调用 Objective-C++ 方法 - Swift 会自动桥接 [[String: NSNumber]] 到 NSArray
+        // 调用 Objective-C++ 方法
         if let resultData = OpenCVInpaintHelper.inpaint(imagePath, rects: nsRects) {
             return resultData as Data
         }

@@ -20,18 +20,22 @@ class RemoveWatermarkPage extends StatefulWidget {
 
 class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
   File? _selectedImage;
-  List<Rect> _watermarkRects = []; // 存储的是显示坐标
-  final ValueNotifier<List<Rect>> _watermarkRectsNotifier = ValueNotifier([]); // 用于优化重绘
+  List<List<Offset>> _watermarkPaths = []; // 存储的是显示坐标的路径点列表
+  List<Offset>? _currentPath; // 当前正在绘制的路径
+  final ValueNotifier<List<List<Offset>>> _watermarkPathsNotifier =
+      ValueNotifier([]); // 用于优化重绘
   bool _isProcessing = false;
   img.Image? _uiImage; // 缓存图片对象，用于坐标转换
   // ignore: unused_field
   img.Image? _processedImage; // 处理后的图片，用于实时预览（保留用于未来扩展）
   // ignore: unused_field
   Uint8List? _processedImageBytes; // 缓存处理后的图片字节，避免重复编码（保留用于未来扩展）
-  final ValueNotifier<Uint8List?> _processedImageNotifier = ValueNotifier<Uint8List?>(null); // 用于优化图片更新
-  bool _isDragging = false; // 是否正在拖动（用于防抖判断）
-  Timer? _processDebounceTimer; // 防抖定时器
-  int _processedWatermarkCount = 0; // 已处理的水印数量，用于只显示未处理的红框
+  final ValueNotifier<Uint8List?> _processedImageNotifier =
+      ValueNotifier<Uint8List?>(null); // 用于优化图片更新
+  bool _isDragging = false; // 是否正在拖动
+  Timer? _processDebounceTimer; // 3秒延迟定时器
+  int _processedWatermarkCount = 0; // 已处理的水印数量，用于只显示未处理的路径
+  static const double _eraserStrokeWidth = 20.0; // 橡皮擦笔触宽度
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
@@ -42,8 +46,9 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
       setState(() {
         _selectedImage = File(image.path);
         _uiImage = decodedImage;
-        _watermarkRects.clear();
-        _watermarkRectsNotifier.value = [];
+        _watermarkPaths.clear();
+        _currentPath = null;
+        _watermarkPathsNotifier.value = [];
         _processedImage = null;
         _processedImageBytes = null;
         _processedImageNotifier.value = null;
@@ -55,23 +60,23 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
 
   Future<void> _saveImage() async {
     if (_selectedImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先选择图片')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先选择图片')));
       return;
     }
-    
-    if (_watermarkRects.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先标记水印区域（拖动选择）')),
-      );
+
+    if (_watermarkPaths.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先标记水印区域（用手指擦除）')));
       return;
     }
-    
+
     if (_uiImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('图片加载失败，请重新选择')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('图片加载失败，请重新选择')));
       return;
     }
 
@@ -93,7 +98,7 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
       final imageAspect = originalImage.width / originalImage.height;
       final availableHeight = screenSize.height - 200; // 减去底部工具栏高度
       final availableWidth = screenSize.width;
-      
+
       double displayWidth, displayHeight;
       if (imageAspect > availableWidth / availableHeight) {
         displayWidth = availableWidth;
@@ -108,62 +113,48 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
       final offsetX = (availableWidth - displayWidth) / 2;
       final offsetY = (availableHeight - displayHeight) / 2;
 
-      // 处理每个水印区域（将显示坐标转换为图片坐标）
-      for (final displayRect in _watermarkRects) {
-        // 转换为图片坐标
-        final imageRect = Rect.fromLTWH(
-          ((displayRect.left - offsetX) * scaleX).clamp(0.0, originalImage.width.toDouble()),
-          ((displayRect.top - offsetY) * scaleY).clamp(0.0, originalImage.height.toDouble()),
-          (displayRect.width * scaleX).clamp(0.0, originalImage.width.toDouble()),
-          (displayRect.height * scaleY).clamp(0.0, originalImage.height.toDouble()),
-        );
-        
-        _removeWatermarkRegion(
-          originalImage,
-          imageRect,
-        );
-      }
-
-      // 保存处理后的图片
-      final processedBytes = img.encodePng(originalImage);
-      
-      // 请求存储权限
-      if (await Permission.photos.isDenied) {
-        await Permission.photos.request();
-      }
-
-      if (await Permission.photos.isGranted) {
-        await ImageGallerySaver.saveImage(
-          processedBytes,
-          quality: 100,
-          name: 'watermark_removed_${DateTime.now().millisecondsSinceEpoch}',
-        );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('图片已保存到相册'),
-              backgroundColor: Colors.green,
-            ),
-          );
+      // 处理每个水印路径（将显示坐标转换为图片坐标）
+      // 注意：保存功能暂时使用OpenCV处理，这里保留接口但实际不会调用
+      // 因为_saveImage现在应该使用已处理的图片
+      if (_processedImageBytes != null) {
+        // 如果已经有处理后的图片，直接使用
+        final processedBytes = _processedImageBytes!;
+        // 保存处理后的图片
+        if (await Permission.photos.isDenied) {
+          await Permission.photos.request();
         }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('需要相册权限才能保存图片'),
-              backgroundColor: Colors.orange,
-            ),
+
+        if (await Permission.photos.isGranted) {
+          await ImageGallerySaver.saveImage(
+            processedBytes,
+            quality: 100,
+            name: 'watermark_removed_${DateTime.now().millisecondsSinceEpoch}',
           );
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('图片已保存到相册'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('需要相册权限才能保存图片'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
         }
+        return;
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('处理失败: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('处理失败: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -175,12 +166,12 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
     }
   }
 
-  // 实时处理水印，用于预览（使用后台线程避免卡顿，添加防抖）
-  Future<void> _processWatermarks({bool debounce = true}) async {
-    // 取消之前的防抖定时器
+  // 实时处理水印，用于预览（3秒延迟后自动处理）
+  Future<void> _processWatermarks({bool immediate = false}) async {
+    // 取消之前的定时器
     _processDebounceTimer?.cancel();
-    
-    if (_selectedImage == null || _watermarkRects.isEmpty || _uiImage == null) {
+
+    if (_selectedImage == null || _watermarkPaths.isEmpty || _uiImage == null) {
       if (mounted) {
         _processedImageBytes = null;
         _processedImageNotifier.value = null;
@@ -192,10 +183,10 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
       return;
     }
 
-    // 防抖处理：延迟执行，避免频繁调用
-    if (debounce) {
-      _processDebounceTimer = Timer(const Duration(milliseconds: 500), () {
-        _processWatermarks(debounce: false);
+    // 如果不是立即处理，延迟3秒
+    if (!immediate) {
+      _processDebounceTimer = Timer(const Duration(seconds: 3), () {
+        _processWatermarks(immediate: true);
       });
       return;
     }
@@ -213,7 +204,7 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
       final imageAspect = _uiImage!.width / _uiImage!.height;
       final availableHeight = screenSize.height - 200;
       final availableWidth = screenSize.width;
-      
+
       double displayWidth, displayHeight;
       if (imageAspect > availableWidth / availableHeight) {
         displayWidth = availableWidth;
@@ -226,18 +217,48 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
       final scaleX = _uiImage!.width / displayWidth;
       final scaleY = _uiImage!.height / displayHeight;
 
-      // 转换为图片坐标的矩形列表
+      // 将路径转换为图片坐标的矩形列表（计算每个路径的边界框）
       final imageRects = <Map<String, double>>[];
-      for (final displayRect in _watermarkRects) {
+      // 只处理未处理的路径
+      final unprocessedPaths = _watermarkPaths.length > _processedWatermarkCount
+          ? _watermarkPaths.sublist(_processedWatermarkCount)
+          : <List<Offset>>[];
+
+      for (final path in unprocessedPaths) {
+        if (path.isEmpty) continue;
+
+        // 计算路径的边界框
+        double minX = path[0].dx;
+        double maxX = path[0].dx;
+        double minY = path[0].dy;
+        double maxY = path[0].dy;
+
+        for (final point in path) {
+          minX = math.min(minX, point.dx);
+          maxX = math.max(maxX, point.dx);
+          minY = math.min(minY, point.dy);
+          maxY = math.max(maxY, point.dy);
+        }
+
+        // 转换为图片坐标，使用适中的 padding 确保覆盖笔触边缘
+        // padding 太小可能导致边缘修复不完整，太大可能导致过度修复
+        final padding = 4.0; // 使用 4 像素（显示坐标），确保完全覆盖水印区域
         final imageRect = Rect.fromLTWH(
-          (displayRect.left * scaleX).clamp(0.0, _uiImage!.width.toDouble()),
-          (displayRect.top * scaleY).clamp(0.0, _uiImage!.height.toDouble()),
-          (displayRect.width * scaleX).clamp(1.0, _uiImage!.width.toDouble()),
-          (displayRect.height * scaleY).clamp(1.0, _uiImage!.height.toDouble()),
+          ((minX - padding) * scaleX).clamp(0.0, _uiImage!.width.toDouble()),
+          ((minY - padding) * scaleY).clamp(0.0, _uiImage!.height.toDouble()),
+          ((maxX - minX + padding * 2) * scaleX).clamp(
+            1.0,
+            _uiImage!.width.toDouble(),
+          ),
+          ((maxY - minY + padding * 2) * scaleY).clamp(
+            1.0,
+            _uiImage!.height.toDouble(),
+          ),
         );
-        
-        if (imageRect.width >= 1 && imageRect.height >= 1 && 
-            imageRect.left < _uiImage!.width && 
+
+        if (imageRect.width >= 1 &&
+            imageRect.height >= 1 &&
+            imageRect.left < _uiImage!.width &&
             imageRect.top < _uiImage!.height) {
           imageRects.add({
             'x': imageRect.left,
@@ -266,28 +287,55 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
         if (!isAvailable) {
           throw Exception('OpenCV 不可用，请确保已正确集成 OpenCV');
         }
-        
-        if (_selectedImage == null) {
-          throw Exception('图片文件不存在');
+
+        // 确定要使用的图片路径：如果有已处理的图片，使用临时文件保存后处理
+        String imagePathToProcess;
+        if (_processedImageBytes != null) {
+          // 如果有已处理的图片，先保存为临时文件，基于它继续处理
+          final tempDir = Directory.systemTemp;
+          final tempFile = File(
+            '${tempDir.path}/watermark_temp_${DateTime.now().millisecondsSinceEpoch}.png',
+          );
+          await tempFile.writeAsBytes(_processedImageBytes!);
+          imagePathToProcess = tempFile.path;
+        } else {
+          // 第一次处理，使用原始图片
+          if (_selectedImage == null) {
+            throw Exception('图片文件不存在');
+          }
+          imagePathToProcess = _selectedImage!.path;
         }
-        
+
         // 使用 OpenCV Inpaint（在后台线程执行）
         // 注意：compute 不能直接调用 async 函数，所以直接在这里调用
         final resultBytes = await OpenCVService.removeWatermarks(
-          _selectedImage!.path,
+          imagePathToProcess,
           imageRects,
         );
-        
+
+        // 清理临时文件
+        if (_processedImageBytes != null &&
+            imagePathToProcess != _selectedImage!.path) {
+          try {
+            final tempFile = File(imagePathToProcess);
+            if (await tempFile.exists()) {
+              await tempFile.delete();
+            }
+          } catch (e) {
+            // 忽略临时文件删除错误
+          }
+        }
+
         if (resultBytes == null) {
           throw Exception('OpenCV 处理失败，返回结果为空');
         }
-        
+
         // 在后台线程解码图片（避免阻塞 UI）
         final processedImage = await compute(_decodeImageBytes, resultBytes);
         if (processedImage == null) {
           throw Exception('无法解码处理后的图片');
         }
-        
+
         if (mounted) {
           // 使用 ValueNotifier 更新，避免整个 widget 树重建
           _processedImage = processedImage;
@@ -297,7 +345,7 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
           setState(() {
             _isProcessing = false;
             // 更新已处理的水印数量（所有当前的水印都已处理）
-            _processedWatermarkCount = _watermarkRects.length;
+            _processedWatermarkCount = _watermarkPaths.length;
           });
         }
       } else {
@@ -328,7 +376,6 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
     return img.decodeImage(bytes);
   }
 
-
   // 静态版本的去除水印方法（用于后台处理，使用改进的patch-based算法）
   static void _removeWatermarkRegionStatic(img.Image image, Rect rect) {
     final x = rect.left.round().clamp(0, image.width - 1);
@@ -339,12 +386,12 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
     if (width <= 0 || height <= 0 || x >= image.width || y >= image.height) {
       return;
     }
-    
+
     final endX = (x + width).clamp(0, image.width);
     final endY = (y + height).clamp(0, image.height);
     final actualWidth = endX - x;
     final actualHeight = endY - y;
-    
+
     if (actualWidth <= 0 || actualHeight <= 0) {
       return;
     }
@@ -355,49 +402,49 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
     for (int py = y; py < endY && py < image.height; py++) {
       for (int px = x; px < endX && px < image.width; px++) {
         final avgColor = _getWeightedAverageColorExcludingRegionStatic(
-          image, 
-          px, 
-          py, 
+          image,
+          px,
+          py,
           largeRadius,
-          x, 
-          y, 
-          actualWidth, 
+          x,
+          y,
+          actualWidth,
           actualHeight,
         );
         image.setPixel(px, py, avgColor);
       }
     }
-    
+
     // 2. 使用中等半径进行精细修复
     const mediumRadius = 15;
     for (int py = y; py < endY && py < image.height; py++) {
       for (int px = x; px < endX && px < image.width; px++) {
         final refinedColor = _getWeightedAverageColorExcludingRegionStatic(
-          image, 
-          px, 
-          py, 
+          image,
+          px,
+          py,
           mediumRadius,
-          x, 
-          y, 
-          actualWidth, 
+          x,
+          y,
+          actualWidth,
           actualHeight,
         );
         image.setPixel(px, py, refinedColor);
       }
     }
-    
+
     // 3. 使用小半径进行边缘平滑
     const smallRadius = 8;
     for (int py = y; py < endY && py < image.height; py++) {
       for (int px = x; px < endX && px < image.width; px++) {
         final smoothedColor = _getWeightedAverageColorExcludingRegionStatic(
-          image, 
-          px, 
-          py, 
+          image,
+          px,
+          py,
           smallRadius,
-          x, 
-          y, 
-          actualWidth, 
+          x,
+          y,
+          actualWidth,
           actualHeight,
         );
         image.setPixel(px, py, smoothedColor);
@@ -407,9 +454,9 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
 
   // 静态版本的加权平均方法（改进版，扩大采样范围，确保有足够的采样点）
   static img.Color _getWeightedAverageColorExcludingRegionStatic(
-    img.Image image, 
-    int x, 
-    int y, 
+    img.Image image,
+    int x,
+    int y,
     int radius,
     int excludeX,
     int excludeY,
@@ -430,21 +477,24 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
         }
 
         // 完全跳过水印区域内的像素
-        final isInExcludeRegion = nx >= excludeX && 
-                                  nx < excludeX + excludeWidth &&
-                                  ny >= excludeY && 
-                                  ny < excludeY + excludeHeight;
-        
+        final isInExcludeRegion =
+            nx >= excludeX &&
+            nx < excludeX + excludeWidth &&
+            ny >= excludeY &&
+            ny < excludeY + excludeHeight;
+
         if (isInExcludeRegion) {
           continue;
         }
 
         final distance = math.sqrt(dx * dx + dy * dy);
         if (distance > radius) continue;
-        
+
         // 使用高斯权重，距离越近权重越大
-        final weight = math.exp(-(distance * distance) / (2 * (radius / 3) * (radius / 3)));
-        
+        final weight = math.exp(
+          -(distance * distance) / (2 * (radius / 3) * (radius / 3)),
+        );
+
         final pixel = image.getPixel(nx, ny);
         r += pixel.r * weight;
         g += pixel.g * weight;
@@ -461,7 +511,7 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
         for (int dx = -extendedRadius; dx <= extendedRadius; dx++) {
           final distance = math.sqrt(dx * dx + dy * dy);
           if (distance <= radius || distance > extendedRadius) continue;
-          
+
           final nx = x + dx;
           final ny = y + dy;
 
@@ -469,18 +519,23 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
             continue;
           }
 
-          final isInExcludeRegion = nx >= excludeX && 
-                                    nx < excludeX + excludeWidth &&
-                                    ny >= excludeY && 
-                                    ny < excludeY + excludeHeight;
-          
+          final isInExcludeRegion =
+              nx >= excludeX &&
+              nx < excludeX + excludeWidth &&
+              ny >= excludeY &&
+              ny < excludeY + excludeHeight;
+
           if (isInExcludeRegion) {
             continue;
           }
 
           // 距离越远权重越小
-          final weight = math.exp(-(distance * distance) / (2 * (radius / 3) * (radius / 3))) * 0.3;
-          
+          final weight =
+              math.exp(
+                -(distance * distance) / (2 * (radius / 3) * (radius / 3)),
+              ) *
+              0.3;
+
           final pixel = image.getPixel(nx, ny);
           r += pixel.r * weight;
           g += pixel.g * weight;
@@ -501,24 +556,25 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
             continue;
           }
 
-          final isInExcludeRegion = nx >= excludeX && 
-                                    nx < excludeX + excludeWidth &&
-                                    ny >= excludeY && 
-                                    ny < excludeY + excludeHeight;
-          
+          final isInExcludeRegion =
+              nx >= excludeX &&
+              nx < excludeX + excludeWidth &&
+              ny >= excludeY &&
+              ny < excludeY + excludeHeight;
+
           if (isInExcludeRegion) {
             continue;
           }
 
           final distance = math.sqrt(dx * dx + dy * dy);
           final weight = 1.0 / (1.0 + distance);
-          
+
           final pixel = image.getPixel(nx, ny);
           r += pixel.r * weight;
           g += pixel.g * weight;
           b += pixel.b * weight;
           totalWeight += weight;
-          
+
           if (totalWeight > 10) break; // 有足够的采样点就停止
         }
         if (totalWeight > 10) break;
@@ -547,13 +603,13 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
     if (width <= 0 || height <= 0 || x >= image.width || y >= image.height) {
       return;
     }
-    
+
     // 确保不会越界
     final endX = (x + width).clamp(0, image.width);
     final endY = (y + height).clamp(0, image.height);
     final actualWidth = endX - x;
     final actualHeight = endY - y;
-    
+
     if (actualWidth <= 0 || actualHeight <= 0) {
       return;
     }
@@ -563,13 +619,13 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
     for (int py = y; py < endY && py < image.height; py++) {
       for (int px = x; px < endX && px < image.width; px++) {
         final avgColor = _getWeightedAverageColorExcludingRegion(
-          image, 
-          px, 
-          py, 
+          image,
+          px,
+          py,
           15, // 增大采样半径
-          x, 
-          y, 
-          actualWidth, 
+          x,
+          y,
+          actualWidth,
           actualHeight,
         );
         image.setPixel(px, py, avgColor);
@@ -580,13 +636,13 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
     for (int py = y; py < endY && py < image.height; py++) {
       for (int px = x; px < endX && px < image.width; px++) {
         final refinedColor = _getWeightedAverageColorExcludingRegion(
-          image, 
-          px, 
-          py, 
-          8, 
-          x, 
-          y, 
-          actualWidth, 
+          image,
+          px,
+          py,
+          8,
+          x,
+          y,
+          actualWidth,
           actualHeight,
         );
         image.setPixel(px, py, refinedColor);
@@ -599,9 +655,9 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
 
   // 使用加权平均，距离越近权重越大，排除指定区域内的像素
   img.Color _getWeightedAverageColorExcludingRegion(
-    img.Image image, 
-    int x, 
-    int y, 
+    img.Image image,
+    int x,
+    int y,
     int radius,
     int excludeX,
     int excludeY,
@@ -621,11 +677,12 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
         }
 
         // 跳过水印区域内的像素（但允许采样边界附近的像素）
-        final isInExcludeRegion = nx >= excludeX && 
-                                  nx < excludeX + excludeWidth &&
-                                  ny >= excludeY && 
-                                  ny < excludeY + excludeHeight;
-        
+        final isInExcludeRegion =
+            nx >= excludeX &&
+            nx < excludeX + excludeWidth &&
+            ny >= excludeY &&
+            ny < excludeY + excludeHeight;
+
         // 如果在水印区域内，跳过（除非是边界像素，边界像素可能已经被处理过）
         if (isInExcludeRegion) {
           // 检查是否是边界像素（距离水印区域边缘很近）
@@ -633,9 +690,13 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
           final distToRight = excludeX + excludeWidth - nx - 1;
           final distToTop = ny - excludeY;
           final distToBottom = excludeY + excludeHeight - ny - 1;
-          final minDistToEdge = [distToLeft, distToRight, distToTop, distToBottom]
-              .reduce((a, b) => a < b ? a : b);
-          
+          final minDistToEdge = [
+            distToLeft,
+            distToRight,
+            distToTop,
+            distToBottom,
+          ].reduce((a, b) => a < b ? a : b);
+
           // 只允许采样距离边缘很近的像素（可能已经被处理过）
           if (minDistToEdge > 2) {
             continue;
@@ -645,10 +706,12 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
         // 计算权重（距离越近权重越大，使用高斯权重）
         final distance = math.sqrt(dx * dx + dy * dy);
         if (distance > radius) continue;
-        
+
         // 高斯权重：距离越近权重越大
-        final weight = math.exp(-(distance * distance) / (2 * (radius / 3) * (radius / 3)));
-        
+        final weight = math.exp(
+          -(distance * distance) / (2 * (radius / 3) * (radius / 3)),
+        );
+
         final pixel = image.getPixel(nx, ny);
         r += pixel.r * weight;
         g += pixel.g * weight;
@@ -685,13 +748,13 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
         if (distToEdge < edgeRadius) {
           // 在边缘区域，使用更小的采样半径，排除水印区域
           final smoothedColor = _getWeightedAverageColorExcludingRegion(
-            image, 
-            px, 
-            py, 
+            image,
+            px,
+            py,
             edgeRadius,
-            x, 
-            y, 
-            width, 
+            x,
+            y,
+            width,
             height,
           );
           image.setPixel(px, py, smoothedColor);
@@ -699,7 +762,6 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
       }
     }
   }
-  
 
   @override
   Widget build(BuildContext context) {
@@ -729,8 +791,9 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
                 _processDebounceTimer?.cancel();
                 setState(() {
                   _selectedImage = null;
-                  _watermarkRects.clear();
-                  _watermarkRectsNotifier.value = [];
+                  _watermarkPaths.clear();
+                  _currentPath = null;
+                  _watermarkPathsNotifier.value = [];
                   _processedImage = null;
                   _processedImageBytes = null;
                   _processedImageNotifier.value = null;
@@ -740,9 +803,7 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
             ),
         ],
       ),
-      body: _selectedImage == null
-          ? _buildEmptyState()
-          : _buildEditorView(),
+      body: _selectedImage == null ? _buildEmptyState() : _buildEditorView(),
     );
   }
 
@@ -757,16 +818,13 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
             color: Theme.of(context).colorScheme.outline,
           ),
           const SizedBox(height: 24),
-          Text(
-            '选择一张图片开始',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          Text('选择一张图片开始', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
             '点击下方按钮从相册选择图片',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
-                ),
+              color: Theme.of(context).colorScheme.outline,
+            ),
           ),
           const SizedBox(height: 32),
           FilledButton.icon(
@@ -816,7 +874,6 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
                   behavior: HitTestBehavior.translucent,
                   onPanStart: (details) {
                     // 将 localPosition 转换为相对于图片的坐标
-                    // 确保坐标在图片范围内
                     final rawX = details.localPosition.dx - offsetX;
                     final rawY = details.localPosition.dy - offsetY;
                     final imageLocalPosition = Offset(
@@ -825,44 +882,47 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
                     );
                     setState(() {
                       _isDragging = true;
-                      _watermarkRects.add(
-                        Rect.fromPoints(
-                          imageLocalPosition,
-                          imageLocalPosition,
-                        ),
-                      );
-                      _watermarkRectsNotifier.value = List.from(_watermarkRects);
+                      // 取消之前的3秒定时器
+                      _processDebounceTimer?.cancel();
+                      // 开始新的路径
+                      _currentPath = [imageLocalPosition];
                     });
                   },
                   onPanUpdate: (details) {
-                    if (_watermarkRects.isNotEmpty) {
+                    if (_currentPath != null) {
                       // 将 localPosition 转换为相对于图片的坐标
-                      // 使用更精确的计算，确保坐标准确
                       final rawX = details.localPosition.dx - offsetX;
                       final rawY = details.localPosition.dy - offsetY;
                       final imageLocalPosition = Offset(
                         rawX.clamp(0.0, displayWidth),
                         rawY.clamp(0.0, displayHeight),
                       );
-                      // 实时更新选择区域，确保跟随手指
-                      final lastRect = _watermarkRects.last;
-                      final newRect = Rect.fromPoints(
-                        lastRect.topLeft,
-                        imageLocalPosition,
-                      );
-                      // 使用 setState 确保立即更新，避免延迟
+                      // 添加点到当前路径
                       setState(() {
-                        _watermarkRects[_watermarkRects.length - 1] = newRect;
-                        _watermarkRectsNotifier.value = List.from(_watermarkRects);
+                        _currentPath!.add(imageLocalPosition);
+                        _watermarkPathsNotifier.value = [
+                          ..._watermarkPaths,
+                          _currentPath!,
+                        ];
                       });
                     }
                   },
                   onPanEnd: (details) {
                     setState(() {
                       _isDragging = false;
+                      // 保存当前路径
+                      if (_currentPath != null && _currentPath!.length > 1) {
+                        _watermarkPaths.add(_currentPath!);
+                        _currentPath = null;
+                        _watermarkPathsNotifier.value = List.from(
+                          _watermarkPaths,
+                        );
+                      } else {
+                        _currentPath = null;
+                      }
                     });
-                    // 完成绘制后，触发处理（带防抖）
-                    if (mounted && _watermarkRects.isNotEmpty) {
+                    // 完成绘制后，启动3秒延迟定时器
+                    if (mounted && _watermarkPaths.isNotEmpty) {
                       _processWatermarks();
                     }
                   },
@@ -896,24 +956,30 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
                           ),
                         ),
                       ),
-                      // 绘制水印标记（只显示未处理的水印红框）
+                      // 绘制水印标记（只显示未处理的路径）
                       Positioned(
                         left: offsetX,
                         top: offsetY,
                         width: displayWidth,
                         height: displayHeight,
                         child: IgnorePointer(
-                          child: ValueListenableBuilder<List<Rect>>(
-                            valueListenable: _watermarkRectsNotifier,
-                            builder: (context, rects, child) {
-                              // 只显示未处理的水印（索引 >= _processedWatermarkCount）
-                              final unprocessedRects = rects.length > _processedWatermarkCount
-                                  ? rects.sublist(_processedWatermarkCount)
-                                  : <Rect>[];
+                          child: ValueListenableBuilder<List<List<Offset>>>(
+                            valueListenable: _watermarkPathsNotifier,
+                            builder: (context, paths, child) {
+                              // 只显示未处理的路径（索引 >= _processedWatermarkCount）
+                              final unprocessedPaths =
+                                  paths.length > _processedWatermarkCount
+                                  ? paths.sublist(_processedWatermarkCount)
+                                  : <List<Offset>>[];
+                              // 包含当前正在绘制的路径
+                              final allPaths = _currentPath != null
+                                  ? [...unprocessedPaths, _currentPath!]
+                                  : unprocessedPaths;
                               return CustomPaint(
                                 size: Size(displayWidth, displayHeight),
-                                painter: _WatermarkPainter(
-                                  watermarkRects: unprocessedRects,
+                                painter: _WatermarkPathPainter(
+                                  watermarkPaths: allPaths,
+                                  strokeWidth: _eraserStrokeWidth,
                                 ),
                               );
                             },
@@ -951,22 +1017,28 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
                   TextButton.icon(
                     onPressed: () {
                       setState(() {
-                        if (_watermarkRects.isNotEmpty) {
-                          _watermarkRects.removeLast();
+                        if (_watermarkPaths.isNotEmpty) {
+                          _watermarkPaths.removeLast();
                           // 如果撤销的是已处理的水印，减少已处理数量
-                          if (_processedWatermarkCount > 0 && 
-                              _watermarkRects.length < _processedWatermarkCount) {
-                            _processedWatermarkCount = _watermarkRects.length;
+                          if (_processedWatermarkCount > 0 &&
+                              _watermarkPaths.length <
+                                  _processedWatermarkCount) {
+                            _processedWatermarkCount = _watermarkPaths.length;
                             // 清除处理结果，因为撤销了已处理的水印
                             _processedImageBytes = null;
                             _processedImageNotifier.value = null;
                             _processedImage = null;
                           }
                         }
-                        _watermarkRectsNotifier.value = List.from(_watermarkRects);
+                        _currentPath = null;
+                        _watermarkPathsNotifier.value = List.from(
+                          _watermarkPaths,
+                        );
                       });
+                      // 取消定时器
+                      _processDebounceTimer?.cancel();
                       // 如果有未处理的水印，重新处理
-                      if (_watermarkRects.length > _processedWatermarkCount) {
+                      if (_watermarkPaths.length > _processedWatermarkCount) {
                         _processWatermarks();
                       }
                     },
@@ -979,18 +1051,19 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
                       _processedImageBytes = null;
                       _processedImageNotifier.value = null;
                       _processedImage = null;
-                      
+
                       setState(() {
                         // 清除所有标记
-                        _watermarkRects.clear();
-                        _watermarkRectsNotifier.value = [];
+                        _watermarkPaths.clear();
+                        _currentPath = null;
+                        _watermarkPathsNotifier.value = [];
                         _isProcessing = false;
                         _processedWatermarkCount = 0; // 重置已处理数量
                       });
-                      
-                      // 取消待处理的防抖任务
+
+                      // 取消待处理的定时器
                       _processDebounceTimer?.cancel();
-                      
+
                       // 显示提示
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1014,45 +1087,53 @@ class _RemoveWatermarkPageState extends State<RemoveWatermarkPage> {
   }
 }
 
-class _WatermarkPainter extends CustomPainter {
-  _WatermarkPainter({
-    required this.watermarkRects,
+class _WatermarkPathPainter extends CustomPainter {
+  _WatermarkPathPainter({
+    required this.watermarkPaths,
+    required this.strokeWidth,
   });
 
-  final List<Rect> watermarkRects;
+  final List<List<Offset>> watermarkPaths;
+  final double strokeWidth;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 如果没有标记，不绘制任何内容
-    if (watermarkRects.isEmpty) {
+    // 如果没有路径，不绘制任何内容
+    if (watermarkPaths.isEmpty) {
       return;
     }
-    
-    // 绘制水印标记区域
-    final watermarkPaint = Paint()
-      ..color = Colors.red.withValues(alpha: 0.3)
-      ..style = PaintingStyle.fill;
-    final borderPaint = Paint()
-      ..color = Colors.red
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
 
-    for (final rect in watermarkRects) {
-      // 确保矩形在有效范围内
-      if (rect.width > 0 && rect.height > 0) {
-        canvas.drawRect(rect, watermarkPaint);
-        canvas.drawRect(rect, borderPaint);
+    // 绘制水印路径（半透明红色，类似橡皮擦标记）
+    final pathPaint = Paint()
+      ..color = Colors.red.withValues(alpha: 0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    for (final path in watermarkPaths) {
+      if (path.length < 2) continue;
+
+      final paintPath = Path();
+      paintPath.moveTo(
+        path[0].dx.clamp(0.0, size.width),
+        path[0].dy.clamp(0.0, size.height),
+      );
+
+      for (int i = 1; i < path.length; i++) {
+        paintPath.lineTo(
+          path[i].dx.clamp(0.0, size.width),
+          path[i].dy.clamp(0.0, size.height),
+        );
       }
+
+      canvas.drawPath(paintPath, pathPaint);
     }
   }
 
   @override
-  bool shouldRepaint(_WatermarkPainter oldDelegate) {
-    // 简化检查：总是重绘以确保实时性（CustomPaint 本身性能很好）
-    return oldDelegate.watermarkRects.length != watermarkRects.length ||
-        (watermarkRects.isNotEmpty && 
-         oldDelegate.watermarkRects.isNotEmpty &&
-         watermarkRects.last != oldDelegate.watermarkRects.last);
+  bool shouldRepaint(_WatermarkPathPainter oldDelegate) {
+    return oldDelegate.watermarkPaths != watermarkPaths ||
+        oldDelegate.strokeWidth != strokeWidth;
   }
 }
-
