@@ -1,3 +1,5 @@
+import com.android.build.gradle.BaseExtension
+
 allprojects {
     repositories {
         google()
@@ -12,6 +14,13 @@ rootProject.layout.buildDirectory.value(newBuildDir)
 subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
+    
+    // 强制所有子项目（包括插件）使用 compileSdk 36
+    afterEvaluate {
+        extensions.findByType<BaseExtension>()?.apply {
+            compileSdkVersion(36)
+        }
+    }
 }
 subprojects {
     project.evaluationDependsOn(":app")

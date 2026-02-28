@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import 'pages/home_page.dart';
-import 'pages/settings_page.dart';
+import 'pages/id_photo_home_page.dart';
 import 'providers/theme_provider.dart';
 import 'theme/app_theme.dart';
+import 'services/database_service.dart';
 
 Future<void> main() async {
     WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +15,9 @@ Future<void> main() async {
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
+
+  // 初始化数据库
+  await DatabaseService.init();
 
     runApp(
     const ProviderScope(
@@ -32,7 +35,7 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: '图片编辑器',
+      title: '证件照处理',
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: {
@@ -40,63 +43,7 @@ class MyApp extends ConsumerWidget {
         AppThemeMode.light: ThemeMode.light,
         AppThemeMode.dark: ThemeMode.dark,
       }[mode],
-      home: const RootTab(),
-    );
-  }
-}
-
-class RootTab extends ConsumerStatefulWidget {
-  const RootTab({super.key});
-
-  @override
-  ConsumerState<RootTab> createState() => _RootTabState();
-}
-
-class _RootTabState extends ConsumerState<RootTab> {
-  int _index = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final pages = <Widget>[
-      const HomePage(),
-      const SettingsPage(),
-    ];
-    return Scaffold(
-      body: IndexedStack(index: _index, children: pages),
-      bottomNavigationBar: Container(
-        color: Theme.of(context).colorScheme.surface,
-        child: SafeArea(
-          top: false,
-          left: false,
-          right: false,
-          bottom: true,
-          child: SizedBox(
-            height: 69,
-            child: BottomNavigationBar(
-              currentIndex: _index,
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              showSelectedLabels: false,
-              showUnselectedLabels: false,
-              selectedItemColor: Theme.of(context).colorScheme.primary,
-              unselectedItemColor: Theme.of(context).colorScheme.outline,
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.image, size: 26),
-                  activeIcon: Icon(Icons.image, size: 30),
-                  label: '',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.settings, size: 26),
-                  activeIcon: Icon(Icons.settings, size: 30),
-                  label: '',
-                ),
-              ],
-              onTap: (i) => setState(() => _index = i),
-            ),
-          ),
-        ),
-      ),
+      home: const IdPhotoHomePage(),
     );
   }
 }

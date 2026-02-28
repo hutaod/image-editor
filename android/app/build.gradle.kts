@@ -17,7 +17,8 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.qualrb.daysreminder"
-    compileSdk = flutter.compileSdkVersion
+    // 使用 API 36 以满足插件和依赖的要求
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -36,7 +37,8 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 24
-        targetSdk = flutter.targetSdkVersion
+        // 设置 targetSdk 为 36 以支持最新功能
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -74,6 +76,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     // Google Play Billing
     implementation("com.android.billingclient:billing:6.1.0")
-    // OpenCV - 使用 jitpack 版本
-    implementation("com.github.opencv:opencv:4.8.0")
+    // OpenCV - 注释掉，因为该依赖在 Maven 仓库中不可用
+    // 如果需要 OpenCV 功能，需要手动集成 OpenCV Android SDK
+    // implementation("com.github.opencv:opencv:4.8.0")
 }
