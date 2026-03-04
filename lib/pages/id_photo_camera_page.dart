@@ -26,6 +26,7 @@ class IdPhotoCameraPage extends HookConsumerWidget {
     final isDetecting = useState(false);
     final frameCount = useState(0);
     final lastDetectionTime = useState<DateTime?>(null);
+    final flashMode = useState<FlashMode>(FlashMode.off); // 默认关闭闪光灯
 
     // 实时人脸检测（优化：降低检测频率）
     void startFaceDetection(CameraController controller) {
@@ -98,6 +99,10 @@ class IdPhotoCameraPage extends HookConsumerWidget {
         );
 
         await controller.initialize();
+        
+        // 设置闪光灯为关闭状态
+        await controller.setFlashMode(FlashMode.off);
+        
         if (context.mounted) {
           cameraController.value = controller;
           isInitialized.value = true;
@@ -151,6 +156,51 @@ class IdPhotoCameraPage extends HookConsumerWidget {
       isFrontCamera.value = !isFrontCamera.value;
       await cameraController.value?.dispose();
       await initializeCamera(isFrontCamera.value);
+    }
+
+    Future<void> _toggleFlash() async {
+      if (cameraController.value == null || !isInitialized.value) return;
+      
+      try {
+        // 切换闪光灯模式：off -> auto -> on -> off
+        FlashMode newMode;
+        switch (flashMode.value) {
+          case FlashMode.off:
+            newMode = FlashMode.auto;
+            break;
+          case FlashMode.auto:
+            newMode = FlashMode.always;
+            break;
+          case FlashMode.always:
+            newMode = FlashMode.off;
+            break;
+          case FlashMode.torch:
+            newMode = FlashMode.off;
+            break;
+        }
+        
+        await cameraController.value!.setFlashMode(newMode);
+        flashMode.value = newMode;
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('设置闪光灯失败: $e')),
+          );
+        }
+      }
+    }
+
+    IconData _getFlashIcon() {
+      switch (flashMode.value) {
+        case FlashMode.off:
+          return Icons.flash_off;
+        case FlashMode.auto:
+          return Icons.flash_auto;
+        case FlashMode.always:
+          return Icons.flash_on;
+        case FlashMode.torch:
+          return Icons.flash_on;
+      }
     }
 
     return Scaffold(
@@ -282,8 +332,22 @@ class IdPhotoCameraPage extends HookConsumerWidget {
                       ),
                     ),
                   ),
-                  // 占位（保持对称）
-                  const SizedBox(width: 70),
+                  // 闪光灯按钮
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(_getFlashIcon(), size: 32),
+                        color: Colors.white,
+                        onPressed: _toggleFlash,
+                      ),
+                      Text(
+                        flashMode.value == FlashMode.off ? '关闭' : 
+                        flashMode.value == FlashMode.auto ? '自动' : '开启',
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

@@ -66,47 +66,47 @@ class IdPhotoHomePage extends HookConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              // 主标题和副标题
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '证件照生成器',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '3秒快速生成',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                    // 人物插图（占位）
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: Colors.purple[100],
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.person, size: 40),
-                    ),
-                  ],
-                ),
-              ),
 
-              const SizedBox(height: 24),
+              // // 主标题和副标题
+              // Padding(
+              //   padding: const EdgeInsets.symmetric(horizontal: 16),
+              //   child: Row(
+              //     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              //     children: [
+              //       Column(
+              //         crossAxisAlignment: CrossAxisAlignment.start,
+              //         children: [
+              //           const Text(
+              //             '证件照生成器',
+              //             style: TextStyle(
+              //               fontSize: 24,
+              //               fontWeight: FontWeight.bold,
+              //             ),
+              //           ),
+              //           const SizedBox(height: 4),
+              //           Text(
+              //             '3秒快速生成',
+              //             style: TextStyle(
+              //               fontSize: 14,
+              //               color: Colors.grey[600],
+              //             ),
+              //           ),
+              //         ],
+              //       ),
+              //       // 人物插图（占位）
+              //       Container(
+              //         width: 80,
+              //         height: 80,
+              //         decoration: BoxDecoration(
+              //           color: Colors.purple[100],
+              //           shape: BoxShape.circle,
+              //         ),
+              //         child: const Icon(Icons.person, size: 40),
+              //       ),
+              //     ],
+              //   ),
+              // ),
+              // const SizedBox(height: 24),
 
               // 功能卡片
               Padding(

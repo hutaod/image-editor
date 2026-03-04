@@ -9,10 +9,7 @@ import 'id_photo_crop_page.dart';
 class IdPhotoSourcePage extends StatelessWidget {
   final IdPhotoTemplate template;
 
-  const IdPhotoSourcePage({
-    super.key,
-    required this.template,
-  });
+  const IdPhotoSourcePage({super.key, required this.template});
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +36,10 @@ class IdPhotoSourcePage extends StatelessWidget {
             children: [
               // 尺寸信息卡片
               Card(
-                margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                margin: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
                 elevation: 2,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -58,18 +58,12 @@ class IdPhotoSourcePage extends StatelessWidget {
                       const SizedBox(height: 12),
                       Text(
                         '${template.widthMm.toStringAsFixed(1)} x ${template.heightMm.toStringAsFixed(1)} mm',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${template.widthPx} x ${template.heightPx} px',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[500],
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                       ),
                     ],
                   ),
@@ -78,31 +72,31 @@ class IdPhotoSourcePage extends StatelessWidget {
 
               const SizedBox(height: 48),
 
-              // 拍照按钮（绿色背景）
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _navigateToCamera(context),
-                    icon: const Icon(Icons.camera_alt, size: 24),
-                    label: const Text(
-                      '拍照',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              // // 拍照按钮（绿色背景）
+              // Padding(
+              //   padding: const EdgeInsets.symmetric(horizontal: 32),
+              //   child: SizedBox(
+              //     width: double.infinity,
+              //     height: 56,
+              //     child: ElevatedButton.icon(
+              //       onPressed: () => _navigateToCamera(context),
+              //       icon: const Icon(Icons.camera_alt, size: 24),
+              //       label: const Text(
+              //         '拍照',
+              //         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              //       ),
+              //       style: ElevatedButton.styleFrom(
+              //         backgroundColor: Colors.green,
+              //         foregroundColor: Colors.white,
+              //         shape: RoundedRectangleBorder(
+              //           borderRadius: BorderRadius.circular(12),
+              //         ),
+              //       ),
+              //     ),
+              //   ),
+              // ),
 
-              const SizedBox(height: 16),
+              // const SizedBox(height: 16),
 
               // 从相册选择按钮（白色边框）
               Padding(
@@ -115,7 +109,10 @@ class IdPhotoSourcePage extends StatelessWidget {
                     icon: const Icon(Icons.photo_library, size: 24),
                     label: const Text(
                       '从相册选择',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.green,
@@ -162,9 +159,9 @@ class IdPhotoSourcePage extends StatelessWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('选择图片失败: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('选择图片失败: $e')));
       }
     }
   }

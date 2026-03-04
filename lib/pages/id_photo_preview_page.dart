@@ -281,36 +281,6 @@ class IdPhotoPreviewPage extends HookConsumerWidget {
                       ),
                     ),
 
-                  // 水印（预览）
-                  if (processedImage.value != null)
-                    Positioned(
-                      bottom: 16,
-                      right: 16,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.8),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              '下载后无水印',
-                              style: TextStyle(fontSize: 10),
-                            ),
-                            const Text(
-                              'ORIGINAL',
-                              style: TextStyle(
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const Text('⭐⭐⭐⭐', style: TextStyle(fontSize: 8)),
-                          ],
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
