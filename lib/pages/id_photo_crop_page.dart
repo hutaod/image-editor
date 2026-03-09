@@ -385,6 +385,9 @@ class _CropWidgetState extends State<_CropWidget> {
   double? cachedMaxOffsetY;
   double? cachedScale;
 
+  // 用于跟踪手势开始时的焦点位置
+  Offset? _initialFocalPoint;
+
   double getScale() => scale;
   Offset getOffset() => offset;
   Size? getTargetImageSize() => targetImageSize;
@@ -652,6 +655,8 @@ class _CropWidgetState extends State<_CropWidget> {
               onScaleStart: (details) {
                 initialScale = scale;
                 initialOffset = offset;
+                // 保存手势开始时的焦点位置
+                _initialFocalPoint = details.localFocalPoint;
               },
               onScaleUpdate: (details) {
                 // 处理缩放
@@ -659,9 +664,19 @@ class _CropWidgetState extends State<_CropWidget> {
                 // 直接使用 details.scale 乘以 initialScale 得到新的缩放值
                 final newScale = (initialScale * details.scale).clamp(0.5, 3.0);
 
-                // 处理移动 - 使用focalPointDelta（相对于上次的移动）
-                // 注意：focalPointDelta 在缩放时可能包含焦点移动，需要正确处理
-                final newOffset = initialOffset + details.focalPointDelta;
+                // 处理移动
+                // 使用当前焦点位置相对于初始焦点位置的偏移来计算移动
+                // 这样可以避免 focalPointDelta 的不确定性（增量 vs 累积值）
+                Offset newOffset;
+                if (_initialFocalPoint != null) {
+                  // 计算从手势开始到现在的累积移动
+                  final focalPointDelta =
+                      details.localFocalPoint - _initialFocalPoint!;
+                  newOffset = initialOffset + focalPointDelta;
+                } else {
+                  // 如果 _initialFocalPoint 为 null，使用 focalPointDelta（向后兼容）
+                  newOffset = initialOffset + details.focalPointDelta;
+                }
 
                 // 更新最大偏移量缓存（只在缩放改变时更新）
                 if ((cachedScale ?? 0) != newScale) {
@@ -689,6 +704,9 @@ class _CropWidgetState extends State<_CropWidget> {
                 }
               },
               onScaleEnd: (details) {
+                // 重置初始焦点位置
+                _initialFocalPoint = null;
+
                 // 手势结束时，立即锁定最终状态，防止iOS回弹
                 if (mounted) {
                   // 重新计算最终偏移量，确保在限制范围内
