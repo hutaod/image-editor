@@ -72,9 +72,6 @@ class EventDetailPage extends ConsumerWidget {
           statusBarIconBrightness: Brightness.light,
           statusBarBrightness: Brightness.dark,
         ),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),

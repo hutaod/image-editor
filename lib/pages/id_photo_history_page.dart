@@ -27,7 +27,7 @@ class IdPhotoHistoryPage extends HookConsumerWidget {
       backgroundColor: Colors.green,
       appBar: AppBar(
         title: const Text('电子照'),
-        backgroundColor: Colors.green,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),

@@ -65,14 +65,14 @@ class _AddRecordPageState extends ConsumerState<AddRecordPage> {
           isEditing ? l10n.editRecord : l10n.addRecord,
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
         systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
-          statusBarBrightness: Brightness.light,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
         ),
         leadingWidth: 100,
         leading: Padding(
@@ -93,7 +93,7 @@ class _AddRecordPageState extends ConsumerState<AddRecordPage> {
                 l10n.cancel,
                 style: const TextStyle(
                   fontSize: 16,
-                  color: Colors.grey,
+                  color: Colors.white,
                   fontWeight: FontWeight.normal,
                 ),
                 maxLines: 1,

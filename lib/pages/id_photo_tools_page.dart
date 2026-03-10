@@ -47,20 +47,6 @@ class IdPhotoToolsPage extends StatelessWidget {
           ),
           _buildToolItem(
             context,
-            icon: Icons.high_quality,
-            iconColor: Colors.pink,
-            title: '人像高清',
-            subtitle: '对模糊图片人像进行清晰度修复增强',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('人像高清功能需要AI支持，暂未实现'),
-                ),
-              );
-            },
-          ),
-          _buildToolItem(
-            context,
             icon: Icons.edit,
             iconColor: Colors.orange,
             title: '图片编辑',
@@ -83,20 +69,6 @@ class IdPhotoToolsPage extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => const IdPhotoFormatConvertPage(),
-                ),
-              );
-            },
-          ),
-          _buildToolItem(
-            context,
-            icon: Icons.format_color_fill,
-            iconColor: Colors.red,
-            title: '黑白图片上色',
-            subtitle: '上传黑白图片立即获取彩色图片',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('黑白上色功能需要AI支持，暂未实现'),
                 ),
               );
             },

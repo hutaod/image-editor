@@ -49,17 +49,13 @@ class IdPhotoHomePage extends HookConsumerWidget {
       appBar: AppBar(
         title: const Text('证件照生成器'),
         centerTitle: true,
-        backgroundColor: Colors.green,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
         ),
         child: SingleChildScrollView(
           child: Column(

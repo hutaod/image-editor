@@ -1,11 +1,9 @@
 import 'dart:typed_data';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
-import 'package:share_plus/share_plus.dart';
 import '../services/image_service.dart';
 import 'package:image/image.dart' as img;
 
@@ -108,28 +106,6 @@ class IdPhotoEditPage extends HookConsumerWidget {
       }
     }
 
-    Future<void> _shareImage() async {
-      if (processedImage.value == null) return;
-
-      try {
-        final tempDir = await Directory.systemTemp;
-        final file = File(
-          '${tempDir.path}/edited_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        );
-        await file.writeAsBytes(processedImage.value!);
-
-        await Share.shareXFiles(
-          [XFile(file.path)],
-          text: '编辑后的图片',
-        );
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('分享失败: $e')),
-          );
-        }
-      }
-    }
 
     String _formatSize(int? bytes) {
       if (bytes == null) return '0 KB';
@@ -143,14 +119,6 @@ class IdPhotoEditPage extends HookConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('图片编辑'),
-        actions: [
-          if (processedImage.value != null)
-            IconButton(
-              icon: const Icon(Icons.share),
-              onPressed: _shareImage,
-              tooltip: '分享',
-            ),
-        ],
       ),
       body: imageBytes.value == null
           ? Center(

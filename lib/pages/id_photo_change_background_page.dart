@@ -4,10 +4,9 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../services/image_service.dart';
-import 'id_photo_download_dialog.dart';
-import '../models/id_photo_template.dart';
-import '../services/template_service.dart';
 
 /// 修改底色页面（用于已有照片更换底色）
 class IdPhotoChangeBackgroundPage extends HookConsumerWidget {
@@ -20,7 +19,6 @@ class IdPhotoChangeBackgroundPage extends HookConsumerWidget {
     final selectedColor = useState<int>(0xFFFFFFFF); // 白色
     final tolerance = useState<double>(0.3);
     final isProcessing = useState<bool>(false);
-    final selectedTemplate = useState<IdPhotoTemplate?>(null);
 
     // 预设颜色
     final presetColors = [
@@ -57,21 +55,54 @@ class IdPhotoChangeBackgroundPage extends HookConsumerWidget {
     }
 
     Future<void> _saveImage() async {
-      if (processedImage.value == null || selectedTemplate.value == null) {
+      if (processedImage.value == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先选择图片和尺寸模板')),
+          const SnackBar(content: Text('请先选择图片')),
         );
         return;
       }
 
-      showDialog(
-        context: context,
-        builder: (context) => IdPhotoDownloadDialog(
-          imageBytes: processedImage.value!,
-          template: selectedTemplate.value!,
-          backgroundColor: selectedColor.value,
-        ),
-      );
+      isProcessing.value = true;
+      try {
+        // 请求相册权限
+        if (await Permission.photos.isDenied) {
+          await Permission.photos.request();
+        }
+
+        if (await Permission.photos.isGranted) {
+          await ImageGallerySaver.saveImage(
+            processedImage.value!,
+            quality: 100,
+            name: 'background_${DateTime.now().millisecondsSinceEpoch}',
+          );
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('保存成功'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } else {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('需要相册权限才能保存图片'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('保存失败: $e')),
+          );
+        }
+      } finally {
+        isProcessing.value = false;
+      }
     }
 
     return Scaffold(
@@ -143,74 +174,6 @@ class IdPhotoChangeBackgroundPage extends HookConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 选择尺寸模板
-                        const Text(
-                          '选择尺寸',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          height: 100,
-                          child: ListView(
-                            scrollDirection: Axis.horizontal,
-                            children: TemplateService.getAllTemplates()
-                                .take(6)
-                                .map((template) {
-                              final isSelected =
-                                  selectedTemplate.value?.id == template.id;
-                              return GestureDetector(
-                                onTap: () {
-                                  selectedTemplate.value = template;
-                                },
-                                child: Container(
-                                  width: 80,
-                                  margin: const EdgeInsets.only(right: 8),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? Colors.blue
-                                          : Colors.grey[300]!,
-                                      width: isSelected ? 2 : 1,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                    color: isSelected
-                                        ? Colors.blue[50]
-                                        : Colors.white,
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        template.name,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: isSelected
-                                              ? FontWeight.bold
-                                              : FontWeight.normal,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${template.widthMm.toInt()}×${template.heightMm.toInt()}',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.grey[600],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-
                         // 预设颜色
                         const Text(
                           '预设颜色',
@@ -331,11 +294,9 @@ class IdPhotoChangeBackgroundPage extends HookConsumerWidget {
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              flex: 2,
                               child: ElevatedButton(
                                 onPressed: isProcessing.value ||
-                                        processedImage.value == null ||
-                                        selectedTemplate.value == null
+                                        processedImage.value == null
                                     ? null
                                     : _saveImage,
                                 style: ElevatedButton.styleFrom(

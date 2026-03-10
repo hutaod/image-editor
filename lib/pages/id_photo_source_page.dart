@@ -18,17 +18,13 @@ class IdPhotoSourcePage extends StatelessWidget {
       appBar: AppBar(
         title: Text(template.name),
         centerTitle: true,
-        backgroundColor: Colors.green,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
         ),
         child: Center(
           child: Column(
